@@ -13,6 +13,8 @@ import argparse
 parser = argparse.ArgumentParser(description='Parameter configurations')
 parser.add_argument('--gpu_id', type=int, default=0, help='GPU Index, (default: 0)')
 parser.add_argument('--sf', type=int, default=2, help='Scale factor for SISR, (default: 2)')
+parser.add_argument('--save_dir', type=str, default=None, help='save path')
+parser.add_argument('--input_dir', type=str, default='./testsets/RealSRSet', help='Scale factor for SISR, (default: 2)')
 parser.add_argument('--disp', type=int, default=0,
                                         help='Whether displaying the log information, (default: 0)')
 
@@ -26,30 +28,38 @@ def main():
     update_args(opts_json, args)
 
     # folder to save the results
-    save_dir = Path('./testsets') / ('RealSRSet_BSRDM_x'+str(args.sf))
+    if args.save_dir is None:
+        save_dir = Path('./testsets') / ('RealSRSet_BSRDM_x'+str(args.sf))
+    else:
+        save_dir = Path(args.save_dir)
     if not save_dir.exists():
         save_dir.mkdir()
 
-    im_path_list = sorted([x for x in Path('./testsets/RealSRSet').glob('*.png')])
+    # im_path_list = sorted([x for x in Path('./testsets/RealSRSet').glob('*.png')])
+    print("Testing {}".format(args.input_dir))
+    im_path_list = sorted([x for x in Path(args.input_dir).glob('*.png')])
     for ii, im_path in enumerate(im_path_list):
         im_name = im_path.stem
-        if im_name in ['frog', 'painting', 'ppt3', 'tiger']:
-            args.rho = 0.1
-        elif im_name in ['oldphoto3']:
-            args.rho = 0.4
-        else:
-            args.rho = 0.2
+        # if im_name in ['frog', 'painting', 'ppt3', 'tiger']:
+        #     args.rho = 0.1
+        # elif im_name in ['oldphoto3']:
+        #     args.rho = 0.4
+        # else:
+        #     args.rho = 0.2
+        args.rho = 0.2
 
         print('{:02d}/{:02d}: Image: {:15s}, sf: {:d}, rho={:3.1f}'.format(ii+1, len(im_path_list), im_name, args.sf, args.rho))
 
         im_LR = cv2.imread(str(im_path), flags=cv2.IMREAD_UNCHANGED)   # [0, 255], uint8
+        if im_LR.shape[2] > 3:
+            im_LR = im_LR[:,:,:3]
         im_LR = img_as_float32(im_LR)                                  # [0, 1.0], float32
         if im_LR.ndim == 3:
             im_LR = im_LR[:, :, ::-1].copy()
         trainer_sisr = Trainer(args, im_LR)
         trainer_sisr.train()
         im_HR_est = trainer_sisr.get_HR_res()
-        save_path = save_dir / (im_name + '_BSRDM.png')
+        save_path = save_dir / (im_name + '.png')
         cv2.imwrite(str(save_path), im_HR_est[:, :, ::-1])
 
 if __name__ == '__main__':
